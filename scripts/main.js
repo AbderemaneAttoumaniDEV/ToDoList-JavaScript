@@ -1,153 +1,336 @@
-// Récupère nos éléments HTML et on les stocke
+// Récupère nos éléments HTML
 let form = document.getElementById("form");
 let title = form.querySelector("#title");
 let description = form.querySelector("#description");
+let categorySelect = form.querySelector("#category");
+let taskCount = document.getElementById("task-count");
+let themeToggle = document.getElementById("theme-toggle");
+let searchInput = document.getElementById("search");
 
-// Tableau qui stockera nos tâches
 let taskList = [];
 
-// Charger les tâches depuis localStorage lors du chargement de la page
+// Charger les tâches depuis localStorage
 window.onload = function () {
+    // Charger le mode depuis localStorage
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme) {
+        applyTheme(storedTheme); // Applique le thème stocké
+    } else {
+        // Si aucun thème n'est stocké, on définit le mode clair par défaut
+        applyTheme('light');
+    }
+
+    // Charger les tâches depuis localStorage
     const savedTasks = localStorage.getItem('tasks');
     if (savedTasks) {
         taskList = JSON.parse(savedTasks);
         taskList.forEach(task => addTask(task));
+        updateTaskCount();
     }
+    // Appliquer les styles des champs de texte et des éléments de la liste en fonction du thème actuel
+    updateFormFieldsTheme();
+    updateTaskListTheme();
 };
 
-// Depuis la variable form, je lui affecte un évènement de type submit (soumission de formulaire)
+// Soumission du formulaire pour ajouter une tâche
 form.addEventListener("submit", function (event) {
-    // Bloquer le rechargement de la page
     event.preventDefault();
 
-    // Déclaration de notre objet
     let newTask = {
         title: title.value,
-        description: description.value
+        description: description.value,
+        category: categorySelect.value,
+        completed: false
     };
 
-    // Vérifier si les champs sont vides
     if (newTask.title === "" || newTask.description === "") {
         alert("Champ vide");
         return;
     }
 
-    // Ajouter la tâche dans le tableau taskList
     taskList.push(newTask);
-
-    // Sauvegarder dans localStorage
     saveTasksToLocalStorage();
-
-    // Ajouter la tâche dans la liste UL (affichage des tâches)
     addTask(newTask);
 
-    // Réinitialiser les champs du formulaire après ajout
     title.value = "";
     description.value = "";
+    updateTaskCount();
 });
 
+// Ajouter une tâche dans l'interface
 function addTask(taskToAdd) {
-    // Importer notre <ul> via son id "list"
     let list = document.getElementById('list');
-
-    // Créer une nouvelle balise <li>
     let li = document.createElement("li");
 
-    // Ajouter le titre et la description dans la balise <li>
-    li.textContent = taskToAdd.title + " : " + taskToAdd.description;
+    // Appliquer les bonnes classes en fonction du mode (clair ou sombre)
+    if (document.body.classList.contains("bg-gray-900")) {
+        li.className = "flex justify-between items-center bg-gray-700 text-white rounded-md shadow p-4 hover:bg-gray-800 transition";
+    } else {
+        li.className = "flex justify-between items-center bg-gray-100 text-gray-900 rounded-md shadow p-4 hover:bg-gray-200 transition";
+    }
 
-    // Créer le bouton Modifier
+    let taskContent = document.createElement("div");
+    taskContent.textContent = `(${taskToAdd.category}) ${taskToAdd.title} : ${taskToAdd.description}`;
+    taskContent.className = `text-gray-400 font-medium ${taskToAdd.completed ? 'line-through' : ''}`;
+
+    // Affichage de la date de création
+    let taskDate = document.createElement("span");
+    taskDate.className = "text-xs text-gray-500";
+    taskDate.textContent = `Créé le : ${new Date(taskToAdd.createdAt).toLocaleString()}`;
+
+    // Ajouter un conteneur pour la date
+    let taskHeader = document.createElement("div");
+    taskHeader.className = "flex justify-between items-center";
+    taskHeader.append(taskContent, taskDate);
+
     let editButton = document.createElement("button");
     editButton.textContent = 'Modifier';
+    editButton.className = "text-sm bg-yellow-500 text-white py-1 px-3 rounded-md hover:bg-yellow-600 transition";
+
+    let deleteButton = document.createElement("button");
+    deleteButton.textContent = 'Supprimer';
+    deleteButton.className = "text-sm bg-red-500 text-white py-1 px-3 rounded-md hover:bg-red-600 transition";
+
+    let completeCheckbox = document.createElement("input");
+    completeCheckbox.type = "checkbox";
+    completeCheckbox.checked = taskToAdd.completed;
+    completeCheckbox.className = "mr-2";
+    completeCheckbox.addEventListener("change", function () {
+        taskToAdd.completed = completeCheckbox.checked;
+        taskContent.classList.toggle('line-through', taskToAdd.completed);
+        saveTasksToLocalStorage();
+        updateTaskCount();
+    });
+
     editButton.addEventListener("click", function () {
         editTask(taskToAdd, li);
     });
-
-    // Créer le bouton Supprimer
-    let deleteButton = document.createElement("button");
-    deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener("click", function () {
         deleteTask(taskToAdd, li);
     });
 
-    // Ajouter les boutons à la balise <li>
-    li.append(editButton);
-    li.append(deleteButton);
+    let buttonGroup = document.createElement("div");
+    buttonGroup.className = "flex space-x-2";
+    buttonGroup.append(editButton, deleteButton);
 
-    // Ajouter l'élément <li> à la liste <ul> avec une animation
-    li.style.opacity = "0";
-    list.append(li);
-    setTimeout(() => {
-        li.style.opacity = "1";
-    }, 100); // Ajoute une légère animation pour l'apparition
+    li.append(completeCheckbox, taskContent, buttonGroup);
+    list.appendChild(li);
+    updateTaskCount();
 }
 
+// Supprimer une tâche
 function deleteTask(taskToDelete, taskElement) {
-    // Supprimer l'élément li de la liste ul avec une animation
     taskElement.style.opacity = "0";
     setTimeout(() => {
         taskElement.remove();
-    }, 300); // Retirer après animation
-
-    // Supprimer la tâche du tableau
-    taskList = taskList.filter(task => task !== taskToDelete);
-
-    // Sauvegarder dans localStorage après suppression
-    saveTasksToLocalStorage();
+        taskList = taskList.filter(task => task !== taskToDelete);
+        saveTasksToLocalStorage();
+        updateTaskCount();
+    }, 300);
 }
 
+// Modifier une tâche
 function editTask(taskToEdit, taskElement) {
-    // Remplir les champs input avec les valeurs actuelles de la tâche à modifier
+    // Enregistrer les valeurs d'origine pour pouvoir les restaurer si nécessaire
+    const originalTitle = taskToEdit.title;
+    const originalDescription = taskToEdit.description;
+    const originalCategory = taskToEdit.category;
     title.value = taskToEdit.title;
     description.value = taskToEdit.description;
+    categorySelect.value = taskToEdit.category;
 
-    // Changer le bouton "Ajouter" en bouton "Enregistrer" lors de la modification
     let saveButton = document.createElement("button");
     saveButton.textContent = "Enregistrer";
+    saveButton.className = "w-full bg-green-500 text-white py-2 px-4 rounded-md shadow-md hover:bg-green-600 transition-all duration-300";
 
-    // Remplacer le bouton "Ajouter" par "Enregistrer"
     let addButton = form.querySelector("button");
     form.replaceChild(saveButton, addButton);
 
-    // Ajouter un événement au bouton "Enregistrer"
     saveButton.addEventListener("click", function (event) {
         event.preventDefault();
-
-        // Mettre à jour les valeurs de la tâche
         taskToEdit.title = title.value;
         taskToEdit.description = description.value;
+        taskToEdit.category = categorySelect.value;
 
-        // Mettre à jour l'affichage de la tâche dans l'élément li sans en créer un nouveau
-        taskElement.textContent = taskToEdit.title + " : " + taskToEdit.description;
+        taskElement.querySelector("div").textContent = `(${taskToEdit.category}) ${taskToEdit.title} : ${taskToEdit.description}`;
 
-        // Réajouter les boutons Modifier et Supprimer après mise à jour
-        taskElement.appendChild(editButton);
-        taskElement.appendChild(deleteButton);
-
-        // Sauvegarder dans localStorage après modification
         saveTasksToLocalStorage();
-
-        // Réinitialiser le formulaire et remplacer le bouton "Enregistrer" par le bouton "Ajouter"
         form.replaceChild(addButton, saveButton);
         title.value = "";
         description.value = "";
-    });
-
-    // Création des boutons Modifier et Supprimer qui doivent être réutilisés après modification
-    let editButton = document.createElement("button");
-    editButton.textContent = 'Modifier';
-    editButton.addEventListener("click", function () {
-        editTask(taskToEdit, taskElement);
-    });
-
-    let deleteButton = document.createElement("button");
-    deleteButton.textContent = 'Supprimer';
-    deleteButton.addEventListener("click", function () {
-        deleteTask(taskToEdit, taskElement);
+        updateTaskCount();
     });
 }
 
-// Sauvegarder la liste des tâches dans localStorage
+// Sauvegarder les tâches dans localStorage
 function saveTasksToLocalStorage() {
     localStorage.setItem('tasks', JSON.stringify(taskList));
+}
+
+// Mettre à jour le compteur de tâches
+function updateTaskCount() {
+    const totalTasks = taskList.length;
+    const completedTasks = taskList.filter(task => task.completed).length;
+    taskCount.textContent = `Tâches totales : ${totalTasks} | Complétées : ${completedTasks}`;
+}
+
+// Recherche dynamique des tâches
+searchInput.addEventListener("input", function () {
+    const searchQuery = searchInput.value.toLowerCase();
+    let filteredTasks = taskList.filter(task => 
+        task.title.toLowerCase().includes(searchQuery) || 
+        task.description.toLowerCase().includes(searchQuery)
+    );
+    updateTaskList(filteredTasks);
+});
+
+// Mettre à jour la liste affichée
+function updateTaskList(filteredTasks) {
+    let list = document.getElementById('list');
+    list.innerHTML = "";
+    filteredTasks.forEach(task => addTask(task));
+}
+
+// Basculement du mode clair/sombre
+themeToggle.addEventListener("click", function () {
+    const currentTheme = document.body.classList.contains("bg-gray-900") ? "dark" : "light";
+    // Applique l'autre thème
+    const newTheme = currentTheme === "dark" ? "light" : "dark";
+
+    applyTheme(newTheme);
+    // Appliquer les styles des champs de texte et des éléments de la liste en fonction du nouveau mode
+    updateFormFieldsTheme();
+    updateTaskListTheme();
+
+    // Sauvegarder le thème dans localStorage pour qu'il persiste après un rechargement
+    localStorage.setItem('theme', newTheme);
+});
+
+// Mettre à jour les champs de texte (Titre, Description, Catégorie, Rechercher)
+function updateFormFieldsTheme() {
+    let title = document.getElementById("title");
+    let description = document.getElementById("description");
+    let searchInput = document.getElementById("search");
+    let categorySelect = document.getElementById("category");
+
+    if (document.body.classList.contains("bg-gray-900")) {
+        // Mode sombre : texte clair sur fond sombre
+        title.classList.add("bg-gray-700", "text-white", "border-gray-600");
+        description.classList.add("bg-gray-700", "text-white", "border-gray-600");
+        searchInput.classList.add("bg-gray-700", "text-white", "border-gray-600");
+        categorySelect.classList.add("bg-gray-700", "text-white", "border-gray-600");
+
+        title.classList.remove("bg-white", "text-gray-900", "border-gray-300");
+        description.classList.remove("bg-white", "text-gray-900", "border-gray-300");
+        searchInput.classList.remove("bg-white", "text-gray-900", "border-gray-300");
+        categorySelect.classList.remove("bg-white", "text-gray-900", "border-gray-300");
+    } else {
+        // Mode clair : texte sombre sur fond clair
+        title.classList.add("bg-white", "text-gray-900", "border-gray-300");
+        description.classList.add("bg-white", "text-gray-900", "border-gray-300");
+        searchInput.classList.add("bg-white", "text-gray-900", "border-gray-300");
+        categorySelect.classList.add("bg-white", "text-gray-900", "border-gray-300");
+
+        title.classList.remove("bg-gray-700", "text-white", "border-gray-600");
+        description.classList.remove("bg-gray-700", "text-white", "border-gray-600");
+        searchInput.classList.remove("bg-gray-700", "text-white", "border-gray-600");
+        categorySelect.classList.remove("bg-gray-700", "text-white", "border-gray-600");
+    }
+}
+
+// Mettre à jour le thème des éléments de la liste (en mode sombre ou clair)
+function updateTaskListTheme() {
+    let listItems = document.querySelectorAll("#list li");
+
+    listItems.forEach(item => {
+        if (document.body.classList.contains("bg-gray-900")) {
+            item.classList.add("bg-gray-700", "text-white", "border-gray-600");
+            item.classList.remove("bg-gray-100", "text-gray-900", "border-gray-300");
+        } else {
+            item.classList.add("bg-gray-100", "text-gray-900", "border-gray-300");
+            item.classList.remove("bg-gray-700", "text-white", "border-gray-600");
+        }
+    });
+}
+// Fonction qui applique les bonnes classes en fonction du thème
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.body.classList.add("bg-gray-900", "text-white");
+        document.body.classList.remove("bg-gray-100", "text-gray-900");
+        themeToggle.textContent = "Mode Clair"; // Mise à jour du texte du bouton
+    } else {
+        document.body.classList.add("bg-gray-100", "text-gray-900");
+        document.body.classList.remove("bg-gray-900", "text-white");
+        themeToggle.textContent = "Mode Sombre"; // Mise à jour du texte du bouton
+    }
+}
+
+
+form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    let newTask = {
+        title: title.value,
+        description: description.value,
+        category: categorySelect.value,
+        completed: false,
+        createdAt: new Date().toISOString()  // Ajouter la date de création
+    };
+
+    if (newTask.title === "" || newTask.description === "") {
+        return;
+    }
+
+    taskList.push(newTask);
+    saveTasksToLocalStorage();
+    addTask(newTask);
+
+    title.value = "";
+    description.value = "";
+    updateTaskCount();
+});
+
+
+// Récupérer le bouton de filtrage et les options de tri
+let sortButton = document.getElementById("sort-button");
+let sortOptions = document.getElementById("sort-options");
+
+// Ajouter un événement pour afficher/masquer les options de tri
+sortButton.addEventListener("click", function () {
+    sortOptions.classList.toggle("hidden"); // Afficher ou cacher les options de tri
+});
+
+// Récupérer l'élément des options de tri
+sortOptions.addEventListener("change", function () {
+    let selectedOption = sortOptions.value; // Récupérer la valeur sélectionnée
+    sortTasks(selectedOption); // Appliquer le tri en fonction de la sélection
+});
+
+function sortTasks(criteria) {
+    let sortedTasks;
+
+    switch (criteria) {
+        case "title-asc":
+            sortedTasks = [...taskList].sort((a, b) => a.title.localeCompare(b.title));
+            break;
+        case "title-desc":
+            sortedTasks = [...taskList].sort((a, b) => b.title.localeCompare(a.title));
+            break;
+        case "category":
+            sortedTasks = [...taskList].sort((a, b) => a.category.localeCompare(b.category));
+            break;
+        case "completed":
+            sortedTasks = [...taskList].sort((a, b) => a.completed - b.completed);
+            break;
+        case "date-asc":
+            sortedTasks = [...taskList].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            break;
+        case "date-desc":
+            sortedTasks = [...taskList].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            break;
+        default:
+            sortedTasks = taskList;
+    }
+
+    updateTaskList(sortedTasks);
 }
