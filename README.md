@@ -58,7 +58,9 @@ Pour contribuer ou personnaliser le projet :
 5. **Soumettez une pull request** pour proposer vos changements
 
 ## 📌 Liens utiles
+
 Démo en ligne : <a href="https://abderemaneattoumanidev.github.io/ToDoList-JavaScript/" target="_blank">To Do List - JavaScript</a>
+
 Auteur : <a href="https://www.linkedin.com/in/abd%C3%A9r%C3%A9mane-attoumani-4770ba301/" target="_blank">Abdérémane Attoumani</a> 
 
 ## © 2024 Abdérémane Attoumani
